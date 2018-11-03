@@ -24,7 +24,21 @@ public class ExampleBot extends Bot {
         Map<Player, Position> assignedPlayerDestinations = new HashMap<>();
         List<Position> nextPositions = new ArrayList<>();
         moves.addAll(doCollect(gameState, assignedPlayerDestinations, nextPositions));
-        moves.addAll(doExplore(gameState, nextPositions));
+
+        List<Move> expMoves =  doExplore(gameState, nextPositions);
+
+        List<Move> toRemove = new ArrayList<Move>();
+        for (Move e: expMoves){
+            for (Move m: moves){
+                if (m.getPlayer() == e.getPlayer()){
+                    if (!toRemove.contains(e))
+                     toRemove.add(e);
+
+                }
+            }
+        }
+        expMoves.removeAll(toRemove);
+        moves.addAll(expMoves);
 
         return moves;
     }
@@ -55,6 +69,7 @@ public class ExampleBot extends Bot {
                 collectableRoutes.add(route);
             }
         }
+
         Collections.sort(collectableRoutes);
         for (Route route : collectableRoutes) {
             if (!assignedPlayerDestinations.containsKey(route.getPlayer())
@@ -111,6 +126,7 @@ public class ExampleBot extends Bot {
         List<Move> exploreMoves = new ArrayList<>();
 
         exploreMoves.addAll(gameState.getPlayers().stream()
+                //.filter(player -> isAssignedRoute(player))
                 .filter(player -> isMyPlayer(player))
                 .map(player -> doMove(gameState, nextPositions, player))
                 .collect(Collectors.toList()));
