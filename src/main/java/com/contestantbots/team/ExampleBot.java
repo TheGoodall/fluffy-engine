@@ -24,7 +24,7 @@ public class ExampleBot extends Bot {
     public List<Move> makeMoves(final GameState gameState) {
         gameStateLogger.process(gameState);
         List<Move> moves = new ArrayList<>();
-
+        List<Position> nextPositions = new ArrayList<>();
         moves.addAll(doExplore(gameState));
 
         return moves;
