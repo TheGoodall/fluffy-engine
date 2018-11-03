@@ -23,6 +23,8 @@ public class ExampleBot extends Bot {
         List<Move> moves = new ArrayList<>();
         Map<Player, Position> assignedPlayerDestinations = new HashMap<>();
         List<Position> nextPositions = new ArrayList<>();
+
+
         moves.addAll(doCollect(gameState, assignedPlayerDestinations, nextPositions));
 
         List<Move> expMoves =  doExplore(gameState, nextPositions);
@@ -52,6 +54,33 @@ public class ExampleBot extends Bot {
         return new MoveImpl(player.getId(), direction);
     }
 
+    private List<Route> generateRoutes(final GameState gameState, Set<Player> players, Set<Position> destinations) {
+        List<Route> routes = new ArrayList<>();
+        for (Position destination : destinations) {
+            for (Player player : players) {
+                int distance = gameState.getMap().distance(player.getPosition(), destination);
+                Route route = new Route(player, destination, distance);
+                routes.add(route);
+            }
+        }
+        return routes;
+    }
+
+    private List<Move> assignRoutes(final GameState gameState, final Map<Player, Position> assignedPlayerDestinations, final List<Position> nextPositions, List<Route> routes) {
+        return routes.stream()
+                .filter(route -> !assignedPlayerDestinations.containsKey(route.getPlayer())&& !assignedPlayerDestinations.containsValue(route.getDestination()))
+                .map(route -> {
+                    Optional<Direction> direction = gameState.getMap().directionsTowards(route.getPlayer().getPosition(), route.getDestination()).findFirst();
+                    if (direction.isPresent() && canMove(gameState, nextPositions, route.getPlayer(), direction.get())) {
+                        assignedPlayerDestinations.put(route.getPlayer(), route.getDestination());
+                        return new MoveImpl(route.getPlayer().getId(), direction.get());
+                    }
+                    return null;
+                })
+                .filter(move -> move != null)
+                .collect(Collectors.toList());
+    }
+
     private List<Move> doCollect(final GameState gameState, final Map<Player, Position> assignedPlayerDestinations, final List<Position> nextPositions) {
         List<Move> collectMoves = new ArrayList<>();
         System.out.println(collectMoves.size() + " players collecting");
@@ -61,14 +90,7 @@ public class ExampleBot extends Bot {
         Set<Player> players = gameState.getPlayers().stream()
                 .filter(player -> isMyPlayer(player))
                 .collect(Collectors.toSet());
-        List<Route> collectableRoutes = new ArrayList<>();
-        for (Position collectablePosition : collectablePositions) {
-            for (Player player : players) {
-                int distance = gameState.getMap().distance(player.getPosition(), collectablePosition);
-                Route route = new Route(player, collectablePosition, distance);
-                collectableRoutes.add(route);
-            }
-        }
+        List<Route> collectableRoutes = generateRoutes(gameState, players, collectablePositions);
 
         Collections.sort(collectableRoutes);
         for (Route route : collectableRoutes) {
