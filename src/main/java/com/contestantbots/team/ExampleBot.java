@@ -5,10 +5,7 @@ import com.contestantbots.util.MoveImpl;
 import com.scottlogic.hackathon.client.Client;
 import com.scottlogic.hackathon.game.*;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
@@ -24,7 +21,9 @@ public class ExampleBot extends Bot {
     public List<Move> makeMoves(final GameState gameState) {
         gameStateLogger.process(gameState);
         List<Move> moves = new ArrayList<>();
+        Map<Player, Position> assignedPlayerDestinations = new HashMap<>();
         List<Position> nextPositions = new ArrayList<>();
+        moves.addAll(doCollect(gameState, assignedPlayerDestinations, nextPositions));
         moves.addAll(doExplore(gameState, nextPositions));
 
         return moves;
@@ -37,6 +36,61 @@ public class ExampleBot extends Bot {
             direction = directions.remove(ThreadLocalRandom.current().nextInt(directions.size()));
         } while (!directions.isEmpty() && !canMove(gameState, nextPositions, player, direction));
         return new MoveImpl(player.getId(), direction);
+    }
+
+    private List<Move> doCollect(final GameState gameState, final Map<Player, Position> assignedPlayerDestinations, final List<Position> nextPositions) {
+        List<Move> collectMoves = new ArrayList<>();
+        System.out.println(collectMoves.size() + " players collecting");
+        Set<Position> collectablePositions = gameState.getCollectables().stream()
+                .map(collectable -> collectable.getPosition())
+                .collect(Collectors.toSet());
+        Set<Player> players = gameState.getPlayers().stream()
+                .filter(player -> isMyPlayer(player))
+                .collect(Collectors.toSet());
+        List<Route> collectableRoutes = new ArrayList<>();
+        for (Position collectablePosition : collectablePositions) {
+            for (Player player : players) {
+                int distance = gameState.getMap().distance(player.getPosition(), collectablePosition);
+                Route route = new Route(player, collectablePosition, distance);
+                collectableRoutes.add(route);
+            }
+        }
+        Collections.sort(collectableRoutes);
+        for (Route route : collectableRoutes) {
+            if (!assignedPlayerDestinations.containsKey(route.getPlayer())
+                    && !assignedPlayerDestinations.containsValue(route.getDestination())) {
+                Optional<Direction> direction = gameState.getMap().directionsTowards(route.getPlayer().getPosition(), route.getDestination()).findFirst();
+                if (direction.isPresent() && canMove(gameState, nextPositions, route.getPlayer(), direction.get())) {
+                    collectMoves.add(new MoveImpl(route.getPlayer().getId(), direction.get()));
+                    assignedPlayerDestinations.put(route.getPlayer(), route.getDestination());
+                }
+            }
+        }
+        return collectMoves;
+    }
+
+    public class Route implements Comparable<Route> {
+        private final Player player;
+        private final Position destination;
+        private final int distance;
+        public Route(Player player, Position destination, int distance) {
+            this.player = player;
+            this.destination = destination;
+            this.distance = distance;
+        }
+        public Player getPlayer() {
+            return player;
+        }
+        public Position getDestination() {
+            return destination;
+        }
+        public int getDistance() {
+            return distance;
+        }
+        @Override
+        public int compareTo(Route o) {
+            return distance - o.getDistance();
+        }
     }
 
     private boolean canMove(final GameState gameState, final List<Position> nextPositions, final Player player, final Direction direction) {
