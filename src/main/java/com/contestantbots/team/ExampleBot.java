@@ -3,13 +3,13 @@ package com.contestantbots.team;
 import com.contestantbots.util.GameStateLogger;
 import com.contestantbots.util.MoveImpl;
 import com.scottlogic.hackathon.client.Client;
-import com.scottlogic.hackathon.game.Bot;
-import com.scottlogic.hackathon.game.Direction;
-import com.scottlogic.hackathon.game.GameState;
-import com.scottlogic.hackathon.game.Move;
+import com.scottlogic.hackathon.game.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 public class ExampleBot extends Bot {
@@ -25,16 +25,40 @@ public class ExampleBot extends Bot {
         gameStateLogger.process(gameState);
         List<Move> moves = new ArrayList<>();
         List<Position> nextPositions = new ArrayList<>();
-        moves.addAll(doExplore(gameState));
+        moves.addAll(doExplore(gameState, nextPositions));
 
         return moves;
     }
 
-    private List<Move> doExplore(final GameState gameState) {
+    private Move doMove(final GameState gameState, final List<Position> nextPositions, final Player player) {
+        List<Direction> directions = new ArrayList<>(Arrays.asList(Direction.values()));
+        Direction direction;
+        do {
+            direction = directions.remove(ThreadLocalRandom.current().nextInt(directions.size()));
+        } while (!directions.isEmpty() && !canMove(gameState, nextPositions, player, direction));
+        return new MoveImpl(player.getId(), direction);
+    }
+
+    private boolean canMove(final GameState gameState, final List<Position> nextPositions, final Player player, final Direction direction) {
+        Set<Position> outOfBounds = gameState.getOutOfBoundsPositions();
+        Position newPosition = gameState.getMap().getNeighbour(player.getPosition(), direction);
+        if (!nextPositions.contains(newPosition)
+                && !outOfBounds.contains(newPosition)) {
+            nextPositions.add(newPosition);
+            return true;
+        } else {
+            return false;
+        }
+    }
+    private boolean isMyPlayer(final Player player) {
+        return player.getOwner().equals(getId());
+    }
+    private List<Move> doExplore(final GameState gameState, final List<Position> nextPositions) {
         List<Move> exploreMoves = new ArrayList<>();
 
         exploreMoves.addAll(gameState.getPlayers().stream()
-                .map(player -> new MoveImpl(player.getId(), Direction.NORTH))
+                .filter(player -> isMyPlayer(player))
+                .map(player -> doMove(gameState, nextPositions, player))
                 .collect(Collectors.toList()));
 
         System.out.println(exploreMoves.size() + " players exploring");
